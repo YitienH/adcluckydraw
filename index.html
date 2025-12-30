@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ADC LUCKY DRAW</title>
+  
+  <!-- CDN Dependencies -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --gbc-bg: #f0f0f8;
+      --gbc-blue: #3b4cca;
+      --gbc-yellow: #ffde00;
+      --gbc-red: #cc0000;
+      --gbc-dark: #202020;
+    }
+
+    body {
+      font-family: 'DotGothic16', 'Noto Sans TC', sans-serif;
+      background-color: var(--gbc-bg);
+      color: var(--gbc-dark);
+      /* Pokeball Pattern Background */
+      background-image: 
+        radial-gradient(circle at 50% 50%, #e0e0e0 2px, transparent 2.5px),
+        radial-gradient(circle at 50% 50%, #e0e0e0 2px, transparent 2.5px);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+      overscroll-behavior: none;
+    }
+
+    /* Typography */
+    .font-pixel-en { font-family: 'Press Start 2P', cursive; }
+    .font-heiti { font-family: 'Noto Sans TC', sans-serif; }
+
+    /* Pixel Art Borders */
+    .pixel-border {
+      box-shadow: -4px 0 0 0 #202020, 4px 0 0 0 #202020, 0 -4px 0 0 #202020, 0 4px 0 0 #202020;
+      margin: 4px;
+    }
+    .pixel-border-sm {
+      box-shadow: -2px 0 0 0 #202020, 2px 0 0 0 #202020, 0 -2px 0 0 #202020, 0 2px 0 0 #202020;
+      margin: 2px;
+    }
+
+    /* Ticket Style */
+    .pixel-ticket {
+      background-color: #ffffff;
+      border: 4px solid #202020;
+      box-shadow: 8px 8px 0px rgba(0,0,0,0.15);
+      position: relative;
+    }
+
+    /* Animations */
+    @keyframes shake-hard {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(-5px, 5px) rotate(-5deg); }
+      50% { transform: translate(5px, -5px) rotate(5deg); }
+      75% { transform: translate(-5px, -5px) rotate(-5deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    .animate-shake-hard { animation: shake-hard 0.2s infinite; }
+
+    .typewriter-cursor::after {
+      content: '▼';
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 12px; }
+    ::-webkit-scrollbar-track { background: #e0e0e0; border-left: 2px solid #202020; }
+    ::-webkit-scrollbar-thumb { background: #3b4cca; border: 2px solid #202020; }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "canvas-confetti": "https://esm.sh/canvas-confetti@^1.9.4",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- ICONS (SVG Components) ---
+    const IconWrapper = ({ children, size = 24, className = "" }) => (
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width={size} 
+        height={size} 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        className={className}
+      >
+        {children}
+      </svg>
+    );
+
+    const Icons = {
+      PenLine: (props) => <IconWrapper {...props}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></IconWrapper>,
+      Gift: (props) => <IconWrapper {...props}><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.909 4.909 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></IconWrapper>,
+      Star: (props) => <IconWrapper {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></IconWrapper>,
+      FileText: (props) => <IconWrapper {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></IconWrapper>,
+      Settings: (props) => <IconWrapper {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconWrapper>,
+      Plus: (props) => <IconWrapper {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconWrapper>,
+      Trash2: (props) => <IconWrapper {...props}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconWrapper>,
+      Download: (props) => <IconWrapper {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></IconWrapper>,
+      X: (props) => <IconWrapper {...props}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></IconWrapper>,
+      Trophy: (props) => <IconWrapper {...props}><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M5 4h14a1 1 0 0 1 1 1v2.9a5.9 5.9 0 0 1-1.3 3.65L12 17l-6.7-5.45A5.9 5.9 0 0 1 4 7.9V5a1 1 0 0 1 1-1z"/></IconWrapper>
+    };
+
+    // --- DATA & CONFIG ---
+    const SPEAKER_OPTIONS = [
+      "Zenbook Duo 專案分享",
+      "Zephyrus Duo 專案分享",
+      "ProArt PZ14+Stylus 專案分享",
+      "Strix 2025 量產改善分享",
+      "Xbox & ACSE 分享",
+      "OKR 本 - 軟硬整合",
+      "中國 TA BOOK 共識工作坊",
+      "ProArt PX13 GoPro 專案分享",
+      "ProArt PX13 GoPro 包裝設計分享",
+      "ROG 小島聯名專案分享",
+      "ROG 小島聯名專案 包裝體驗分享",
+      "2026 ADC OKR 布達"
+    ];
+
+    const DEFAULT_PRIZES = [
+      "山海經火漆印章套裝",
+      "論道_組合裝茶",
+      "ROG 墨鏡"
+    ];
+
+    const COOLDOWN_MINUTES = 5;
+    const STORAGE_KEY_USER = 'adc_lottery_user_v2';
+    const STORAGE_KEY_TICKETS = 'adc_lottery_tickets_v2';
+    const STORAGE_KEY_PRIZES = 'adc_lottery_prizes_v2';
+
+    const AppMode = {
+      USER_DROP: 'USER_DROP',
+      ADMIN_DRAW: 'ADMIN_DRAW',
+      ADMIN_LIST: 'ADMIN_LIST'
+    };
+
+    // --- COMPONENTS ---
+    
+    // Retro Button
+    const RetroButton = ({ children, variant = 'primary', className = '', ...props }) => {
+      let baseStyles = "pixel-border-sm relative font-bold text-sm md:text-base py-3 px-4 transition-transform active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed uppercase font-pixel-en tracking-wide";
+      let variantStyles = "";
+
+      switch (variant) {
+        case 'primary': // Blue
+          variantStyles = "bg-[#3b4cca] text-white hover:bg-[#2a3a9a] shadow-[4px_4px_0_0_#1a2a8a]";
+          break;
+        case 'secondary': // Grey
+          variantStyles = "bg-[#e0e0e0] text-[#202020] hover:bg-[#c0c0c0] shadow-[4px_4px_0_0_#808080]";
+          break;
+        case 'danger': // Red
+          variantStyles = "bg-[#cc0000] text-white hover:bg-[#aa0000] shadow-[4px_4px_0_0_#880000]";
+          break;
+        case 'success': // Yellow/Gold
+          variantStyles = "bg-[#ffde00] text-[#202020] hover:bg-[#eecb00] shadow-[4px_4px_0_0_#bba500]";
+          break;
+      }
+
+      return (
+        <button className={`${baseStyles} ${variantStyles} ${className}`} {...props}>
+          <div className="flex items-center justify-center gap-2">{children}</div>
+        </button>
+      );
+    };
+
+    // Retro Card
+    const RetroCard = ({ children, className = '', title, subTitle }) => {
+      return (
+        <div className={`pixel-border bg-white relative ${className}`}>
+          {title && (
+            <div className="bg-[#3b4cca] text-white p-2 border-b-4 border-[#202020] flex justify-between items-end">
+              <h2 className="text-xl font-bold tracking-widest font-pixel-en uppercase shadow-black drop-shadow-md">{title}</h2>
+              {subTitle && <span className="text-xs text-[#ffde00] font-bold font-pixel-en mb-1">{subTitle}</span>}
+            </div>
+          )}
+          <div className="p-4 md:p-6">{children}</div>
+          <div className="absolute top-0 left-0 w-1 h-1 bg-white z-10"></div>
+          <div className="absolute top-0 right-0 w-1 h-1 bg-white z-10"></div>
+          <div className="absolute bottom-0 left-0 w-1 h-1 bg-white z-10"></div>
+          <div className="absolute bottom-0 right-0 w-1 h-1 bg-white z-10"></div>
+        </div>
+      );
+    };
+
+    // Pixel Lucky Box (SVG)
+    const PixelLuckyBox = ({ shaking }) => (
+      <svg width="120" height="120" viewBox="0 0 120 120" className={`mx-auto ${shaking ? 'animate-shake-hard' : ''}`}>
+        <rect x="20" y="20" width="80" height="80" fill="#cc0000" stroke="#202020" strokeWidth="4" />
+        <rect x="20" y="20" width="80" height="20" fill="#ffde00" stroke="#202020" strokeWidth="4" />
+        <rect x="50" y="50" width="20" height="20" fill="#202020" />
+        <rect x="24" y="24" width="72" height="4" fill="#ffffff" fillOpacity="0.5" />
+        <rect x="24" y="44" width="8" height="52" fill="#000000" fillOpacity="0.1" />
+      </svg>
+    );
+
+    // --- MAIN APP ---
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [inputName, setInputName] = useState('');
+      const [tickets, setTickets] = useState([]);
+      const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
+      const [mode, setMode] = useState(AppMode.USER_DROP);
+      
+      const [selectedTopic, setSelectedTopic] = useState(SPEAKER_OPTIONS[0]);
+      const [feedback, setFeedback] = useState('');
+      
+      const [selectedPrize, setSelectedPrize] = useState('');
+      const [showPrizeManager, setShowPrizeManager] = useState(false);
+      const [newPrizeInput, setNewPrizeInput] = useState('');
+      const [showWinnerList, setShowWinnerList] = useState(false);
+      
+      const [isDrawing, setIsDrawing] = useState(false);
+      const [drawStep, setDrawStep] = useState('idle');
+      const [finalWinner, setFinalWinner] = useState(null);
+
+      useEffect(() => {
+        const savedUser = localStorage.getItem(STORAGE_KEY_USER);
+        if (savedUser) setUser(JSON.parse(savedUser));
+
+        const savedTickets = localStorage.getItem(STORAGE_KEY_TICKETS);
+        if (savedTickets) setTickets(JSON.parse(savedTickets));
+
+        const savedPrizes = localStorage.getItem(STORAGE_KEY_PRIZES);
+        if (savedPrizes) {
+          const parsed = JSON.parse(savedPrizes);
+          setPrizes(parsed);
+          setSelectedPrize(parsed[0] || '');
+        } else {
+          setSelectedPrize(DEFAULT_PRIZES[0]);
+        }
+      }, []);
+
+      const saveTickets = (newTickets) => {
+        setTickets(newTickets);
+        localStorage.setItem(STORAGE_KEY_TICKETS, JSON.stringify(newTickets));
+      };
+
+      const saveUser = (newUser) => {
+        setUser(newUser);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
+      };
+
+      const savePrizes = (newPrizes) => {
+        setPrizes(newPrizes);
+        localStorage.setItem(STORAGE_KEY_PRIZES, JSON.stringify(newPrizes));
+        if (newPrizes.length > 0 && !newPrizes.includes(selectedPrize)) {
+          setSelectedPrize(newPrizes[0]);
+        }
+      };
+
+      const handleExportCSV = () => {
+        const BOM = "\uFEFF";
+        const header = ["ID,From,To,Feedback,Timestamp,IsWinner,Prize"];
+        const rows = tickets.map(t => {
+          const safeFeedback = `"${t.feedback.replace(/"/g, '""')}"`;
+          const safeFrom = `"${t.from.replace(/"/g, '""')}"`;
+          return [
+            t.id,
+            safeFrom,
+            `"${t.to}"`,
+            safeFeedback,
+            new Date(t.timestamp).toISOString(),
+            t.isWinner ? "TRUE" : "FALSE",
+            `"${t.wonPrize || ''}"`
+          ].join(",");
+        });
+
+        const csvContent = BOM + header.concat(rows).join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `adc_feedback_export_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      const handleAddPrize = () => {
+        if (!newPrizeInput.trim()) return;
+        const updated = [...prizes, newPrizeInput.trim()];
+        savePrizes(updated);
+        setNewPrizeInput('');
+      };
+
+      const handleDeletePrize = (index) => {
+        if (!confirm("Delete this prize?")) return;
+        const updated = prizes.filter((_, i) => i !== index);
+        savePrizes(updated);
+      };
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (!inputName.trim()) return;
+        saveUser({ name: inputName.trim(), lastSubmissionTime: 0 });
+      };
+
+      const handleSubmitTicket = (e) => {
+        e.preventDefault();
+        if (!user) return;
+
+        const now = Date.now();
+        const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
+        if (now - user.lastSubmissionTime < cooldownMs) {
+          const remainingMin = Math.ceil((cooldownMs - (now - user.lastSubmissionTime)) / 60000);
+          alert(`Oak's words echoed: There's a time and place for everything!\nWait ${remainingMin} more minutes.`);
+          return;
+        }
+
+        const newTicket = {
+          id: Date.now().toString(),
+          to: selectedTopic,
+          feedback: feedback.trim(),
+          from: user.name,
+          timestamp: now,
+          isWinner: false,
+        };
+
+        saveTickets([...tickets, newTicket]);
+        saveUser({ ...user, lastSubmissionTime: now });
+        setFeedback('');
+        
+        confetti({ shapes: ['square'], colors: ['#3b4cca', '#ffde00', '#cc0000'], particleCount: 50, scalar: 2 });
+      };
+
+      const handleDraw = () => {
+        const eligibleTickets = tickets.filter(t => !t.isWinner);
+        if (eligibleTickets.length === 0) {
+          alert('The box is empty!');
+          return;
+        }
+        if (!selectedPrize) {
+          alert('Select a prize first!');
+          return;
+        }
+
+        setIsDrawing(true);
+        setDrawStep('shaking');
+        
+        setTimeout(() => {
+            const winnerIndex = Math.floor(Math.random() * eligibleTickets.length);
+            const winner = eligibleTickets[winnerIndex];
+            
+            const updatedTickets = tickets.map(t => 
+                t.id === winner.id ? { ...t, isWinner: true, wonPrize: selectedPrize } : t
+            );
+            saveTickets(updatedTickets);
+            setFinalWinner({ ...winner, wonPrize: selectedPrize });
+            setDrawStep('result');
+            setIsDrawing(false);
+
+            confetti({ shapes: ['square'], colors: ['#ffde00', '#ffffff'], spread: 120, particleCount: 100 });
+        }, 2000);
+      };
+
+      const resetDraw = () => {
+        setDrawStep('idle');
+        setFinalWinner(null);
+      };
+
+      // --- RENDER ---
+      if (!user) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            <h1 className="text-3xl md:text-5xl font-pixel-en text-[#3b4cca] mb-8 drop-shadow-[4px_4px_0_rgba(0,0,0,0.2)] text-center leading-normal">
+              ADC<br/>LUCKY DRAW
+            </h1>
+            <RetroCard className="w-full max-w-md bg-[#f8f8f8]">
+              <form onSubmit={handleLogin} className="flex flex-col gap-6">
+                <div className="text-center font-bold text-sm font-heiti">
+                  Welcome, Designer!
+                </div>
+                <div className="bg-white border-4 border-[#202020] p-4">
+                  <label className="block text-xs uppercase font-bold mb-2 text-[#888]">Player Name</label>
+                  <input
+                    type="text"
+                    value={inputName}
+                    onChange={(e) => setInputName(e.target.value)}
+                    placeholder="請輸入完整英文名"
+                    className="w-full bg-transparent border-b-2 border-[#202020] text-xl font-bold focus:outline-none focus:border-[#3b4cca] text-center font-heiti"
+                    maxLength={20}
+                  />
+                </div>
+                <RetroButton type="submit" className="w-full" variant="success">START</RetroButton>
+              </form>
+            </RetroCard>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen pb-24 max-w-2xl mx-auto">
+          {/* HEADER */}
+          <header className="p-4 flex flex-col items-center gap-2 bg-[#cc0000] border-b-4 border-[#202020] sticky top-0 z-50 shadow-lg">
+            <h1 className="text-2xl font-pixel-en text-white drop-shadow-[2px_2px_0_#000]">ADC LUCKY DRAW</h1>
+            <div className="bg-white px-4 py-1 border-2 border-[#202020] rounded-full flex items-center gap-2">
+               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+               <span className="text-xs font-bold uppercase">{user.name}</span>
+            </div>
+          </header>
+
+          {/* MAIN */}
+          <main className="p-4">
+            {/* TICKET MODE */}
+            {mode === AppMode.USER_DROP && (
+              <div className="animate-fade-in-up">
+                <div className="pixel-ticket p-6 pb-8">
+                  <div className="border-4 border-dashed border-[#ccc] p-4 h-full">
+                      <h2 className="text-center text-3xl font-black mb-6 tracking-widest text-[#202020] border-b-2 border-[#202020] pb-4 font-heiti">
+                        抽 獎 券
+                      </h2>
+                      <form onSubmit={handleSubmitTicket} className="space-y-6">
+                        <div>
+                          <label className="block text-xs font-bold uppercase mb-1 text-[#3b4cca] font-pixel-en">Target (To)</label>
+                          <select
+                            value={selectedTopic}
+                            onChange={(e) => setSelectedTopic(e.target.value)}
+                            className="w-full p-3 bg-[#f0f0f0] border-2 border-[#202020] font-bold text-sm font-heiti"
+                          >
+                            {SPEAKER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase mb-1 text-[#3b4cca] font-pixel-en">Feedback</label>
+                          <textarea
+                            value={feedback}
+                            onChange={(e) => setFeedback(e.target.value)}
+                            className="w-full p-3 h-32 bg-[#f0f0f0] border-2 border-[#202020] resize-none font-bold text-base font-heiti"
+                            placeholder="請填寫回饋..."
+                            required
+                          />
+                        </div>
+                        <div className="text-center">
+                          <span className="text-[10px] text-gray-500 uppercase">Cooldown: {COOLDOWN_MINUTES} Minutes</span>
+                        </div>
+                        <RetroButton type="submit" variant="primary" className="w-full text-lg">SUBMIT</RetroButton>
+                      </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DRAW MODE */}
+            {mode === AppMode.ADMIN_DRAW && (
+              <div className="flex flex-col items-center gap-6">
+                {drawStep !== 'result' && (
+                    <div className="w-full bg-white border-2 border-[#202020] p-2 flex gap-2 items-center">
+                        <label className="text-xs font-bold uppercase whitespace-nowrap">Prize:</label>
+                        <select 
+                            className="w-full bg-transparent font-bold text-sm outline-none font-heiti"
+                            value={selectedPrize}
+                            onChange={(e) => setSelectedPrize(e.target.value)}
+                        >
+                            {prizes.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <button onClick={() => setShowPrizeManager(!showPrizeManager)} className="p-1 bg-[#eee] border border-black hover:bg-[#ddd]">
+                            <Icons.Settings size={16} />
+                        </button>
+                    </div>
+                )}
+
+                {showPrizeManager && drawStep !== 'result' && (
+                    <RetroCard title="Prize Management" className="w-full animate-fade-in-up">
+                        <div className="flex gap-2 mb-4">
+                            <input 
+                                value={newPrizeInput} 
+                                onChange={(e) => setNewPrizeInput(e.target.value)}
+                                className="flex-1 border-2 border-black p-2 font-bold text-sm font-heiti"
+                                placeholder="輸入新獎項..."
+                            />
+                            <button onClick={handleAddPrize} className="bg-[#ffde00] border-2 border-black p-2 hover:brightness-110">
+                                <Icons.Plus size={20} />
+                            </button>
+                        </div>
+                        <ul className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                            {prizes.map((p, idx) => (
+                                <li key={idx} className="flex justify-between items-center bg-[#f0f0f0] p-2 border border-[#ccc]">
+                                    <span className="text-xs font-bold truncate font-heiti">{p}</span>
+                                    <button onClick={() => handleDeletePrize(idx)} className="text-red-600 hover:text-red-800">
+                                        <Icons.Trash2 size={16} />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </RetroCard>
+                )}
+
+                <div className="py-10 flex flex-col items-center justify-center min-h-[300px]">
+                    {drawStep === 'idle' && (
+                        <>
+                            <PixelLuckyBox shaking={false} />
+                            <div className="mt-8 text-center">
+                                 <div className="text-2xl font-bold font-pixel-en mb-2">{tickets.filter(t => !t.isWinner).length}</div>
+                                 <div className="text-xs uppercase font-bold text-gray-500">Tickets Loaded</div>
+                            </div>
+                            <RetroButton onClick={handleDraw} variant="success" className="mt-8 w-48 shadow-lg font-heiti text-2xl">
+                                抽獎 !
+                            </RetroButton>
+                        </>
+                    )}
+
+                    {drawStep === 'shaking' && <PixelLuckyBox shaking={true} />}
+
+                    {drawStep === 'result' && finalWinner && (
+                        <div className="w-full animate-scale-in">
+                            <div className="bg-white border-[6px] border-double border-[#202020] rounded-sm p-6 relative shadow-lg">
+                                <div className="text-center border-b-2 border-gray-200 pb-4 mb-4">
+                                    <div className="text-[#3b4cca] font-black text-6xl mb-2 font-pixel-en tracking-tighter drop-shadow-sm">
+                                      {finalWinner.from}
+                                    </div>
+                                    <div className="text-sm text-gray-500 uppercase font-bold">獲得了</div>
+                                    <div className="text-[#cc0000] font-black text-3xl mt-2 font-heiti">
+                                      {finalWinner.wonPrize}!
+                                    </div>
+                                </div>
+                                <div className="bg-[#f8f8f8] p-4 border border-gray-300 rounded font-heiti text-xl font-bold text-[#202020] leading-relaxed">
+                                    "{finalWinner.feedback}"
+                                </div>
+                                <div className="text-right text-xs text-gray-400 mt-2 font-mono">To: {finalWinner.to}</div>
+                                <div className="absolute bottom-2 right-2 typewriter-cursor text-[#cc0000]"></div>
+                            </div>
+                            <RetroButton onClick={resetDraw} variant="primary" className="mt-6 w-full">Confirm (A)</RetroButton>
+                        </div>
+                    )}
+                </div>
+              </div>
+            )}
+
+            {/* LIST MODE */}
+            {mode === AppMode.ADMIN_LIST && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-white p-2 border-2 border-[#202020]">
+                        <h2 className="font-bold uppercase font-pixel-en">Database</h2>
+                        <RetroButton onClick={handleExportCSV} variant="success" className="py-1 px-2 text-xs">
+                            <Icons.Download size={14} className="mr-1" /> Excel
+                        </RetroButton>
+                    </div>
+
+                    <div className="space-y-3">
+                        {tickets.length === 0 && <div className="text-center py-10 text-gray-500">No Data</div>}
+                        {[...tickets].reverse().map(t => (
+                            <div key={t.id} className={`bg-white border-2 border-[#202020] p-3 shadow-[4px_4px_0_0_#ccc] ${t.isWinner ? 'border-[#ffde00]' : ''}`}>
+                                <div className="flex justify-between text-xs font-bold mb-2">
+                                    <span className="text-[#3b4cca] font-pixel-en">{t.from}</span>
+                                    <span className="text-gray-400">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                                </div>
+                                <div className="text-base font-bold text-[#202020] mb-2 font-heiti">{t.feedback}</div>
+                                <div className="flex justify-between items-center border-t border-dashed border-gray-300 pt-2 mt-2">
+                                    <span className="text-[10px] bg-gray-200 px-1 font-heiti">To: {t.to}</span>
+                                    {t.isWinner && (
+                                        <span className="text-[10px] bg-[#ffde00] px-1 font-bold flex items-center gap-1 font-heiti">
+                                            <Icons.Trophy size={10} /> {t.wonPrize}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* WINNER MODAL */}
+            {showWinnerList && (
+                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                    <RetroCard title="Hall of Fame" className="w-full max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between mb-4 items-center">
+                            <span className="text-xs uppercase font-bold">Winners Log</span>
+                            <button onClick={() => setShowWinnerList(false)} className="bg-red-500 text-white p-1 border border-black"><Icons.X size={16} /></button>
+                        </div>
+                        <table className="w-full text-xs text-left">
+                            <thead className="border-b-2 border-black bg-gray-100">
+                                <tr>
+                                    <th className="py-2 pl-2">Name</th>
+                                    <th className="py-2">Prize</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tickets.filter(t => t.isWinner).map(t => (
+                                    <tr key={t.id} className="border-b border-gray-300 hover:bg-yellow-50">
+                                        <td className="py-3 pl-2 font-bold text-[#3b4cca] text-sm">{t.from}</td>
+                                        <td className="py-3 font-heiti font-bold">{t.wonPrize}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </RetroCard>
+                </div>
+            )}
+          </main>
+
+          {/* FOOTER */}
+          <footer className="fixed bottom-0 w-full bg-[#202020] text-white p-2 border-t-4 border-[#ffde00] flex justify-between z-50">
+              <button 
+                onClick={() => setMode(AppMode.USER_DROP)} 
+                className={`p-3 rounded border-2 border-transparent ${mode === AppMode.USER_DROP ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
+                title="填寫抽獎券"
+              >
+                  <Icons.PenLine size={24} />
+              </button>
+              
+              <div className="flex gap-2">
+                <button onClick={() => setShowWinnerList(true)} className="p-3 rounded border-2 border-transparent hover:bg-gray-800 text-white" title="得獎名單">
+                    <Icons.Gift size={24} />
+                </button>
+                <button 
+                    onClick={() => setMode(AppMode.ADMIN_DRAW)} 
+                    className={`p-3 rounded border-2 border-transparent ${mode === AppMode.ADMIN_DRAW ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
+                    title="抽獎介面"
+                >
+                    <Icons.Star size={24} />
+                </button>
+                <button 
+                    onClick={() => setMode(AppMode.ADMIN_LIST)} 
+                    className={`p-3 rounded border-2 border-transparent ${mode === AppMode.ADMIN_LIST ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
+                    title="全部回饋"
+                >
+                    <Icons.FileText size={24} />
+                </button>
+              </div>
+          </footer>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
