@@ -83,11 +83,11 @@
 <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
     "canvas-confetti": "https://esm.sh/canvas-confetti@^1.9.4",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
   }
 }
 </script>
@@ -617,29 +617,29 @@
           </main>
 
           {/* FOOTER */}
-          <footer className="fixed bottom-0 w-full bg-[#202020] text-white p-2 border-t-4 border-[#ffde00] flex justify-between z-50">
+          <footer className="fixed bottom-0 w-full max-w-2xl bg-[#202020] text-white p-2 border-t-4 border-[#ffde00] flex justify-between z-50 left-1/2 -translate-x-1/2">
               <button 
                 onClick={() => setMode(AppMode.USER_DROP)} 
-                className={`p-3 rounded border-2 border-transparent ${mode === AppMode.USER_DROP ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
+                className={`px-4 py-2 rounded border-2 border-transparent ${mode === AppMode.USER_DROP ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
                 title="填寫抽獎券"
               >
-                  <Icons.PenLine size={24} />
+                  <span className="font-heiti font-bold text-lg tracking-widest">再投一張</span>
               </button>
               
-              <div className="flex gap-2">
-                <button onClick={() => setShowWinnerList(true)} className="p-3 rounded border-2 border-transparent hover:bg-gray-800 text-white" title="得獎名單">
+              <div className="hidden sm:flex gap-2 items-center">
+                <button onClick={() => setShowWinnerList(true)} className="p-3 rounded border-2 border-transparent text-gray-500 hover:text-white hover:bg-gray-800 transition-colors" title="得獎名單">
                     <Icons.Gift size={24} />
                 </button>
                 <button 
                     onClick={() => setMode(AppMode.ADMIN_DRAW)} 
-                    className={`p-3 rounded border-2 border-transparent ${mode === AppMode.ADMIN_DRAW ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
+                    className={`p-3 rounded border-2 border-transparent transition-colors ${mode === AppMode.ADMIN_DRAW ? 'bg-[#ffde00] text-black border-black' : 'text-gray-500 hover:text-white hover:bg-gray-800'}`}
                     title="抽獎介面"
                 >
                     <Icons.Star size={24} />
                 </button>
                 <button 
                     onClick={() => setMode(AppMode.ADMIN_LIST)} 
-                    className={`p-3 rounded border-2 border-transparent ${mode === AppMode.ADMIN_LIST ? 'bg-[#ffde00] text-black border-black' : 'hover:bg-gray-800 text-white'}`}
+                    className={`p-3 rounded border-2 border-transparent transition-colors ${mode === AppMode.ADMIN_LIST ? 'bg-[#ffde00] text-black border-black' : 'text-gray-500 hover:text-white hover:bg-gray-800'}`}
                     title="全部回饋"
                 >
                     <Icons.FileText size={24} />
