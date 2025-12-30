@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ADC LUCKY DRAW</title>
+  <title>ADC LUCKY DRAW (Live)</title>
   
   <!-- CDN Dependencies -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -11,6 +11,10 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Firebase SDK (Compat version for easier HTML inclusion) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
@@ -98,6 +102,36 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
+    // --- FIREBASE CONFIGURATION ---
+    // [TODO]: 請填寫您的 Firebase 專案設定
+    const firebaseConfig = {
+    apiKey: "AIzaSyAPlzvOAG9aJTSGpFmf6qBsde2Po-CJanQ",
+    authDomain: "adc-luckydraw.firebaseapp.com",
+    databaseURL: "https://adc-luckydraw-default-rtdb.firebaseio.com/",
+    projectId: "adc-luckydraw",
+    storageBucket: "adc-luckydraw.firebasestorage.app",
+   messagingSenderId: "444458849826",
+    appId: "1:444458849826:web:a7bfe8311c3c550bf71c7b",
+   measurementId: "G-WTXTXEXC3E"
+};
+
+    // Initialize Firebase safely
+    let db = null;
+    let firebaseError = null;
+    
+    try {
+      if (!firebaseConfig.apiKey) {
+        throw new Error("Firebase Config is missing. Please edit the code to add your credentials.");
+      }
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      db = firebase.database();
+    } catch (e) {
+      console.error("Firebase Init Error:", e);
+      firebaseError = e.message;
+    }
+
     // --- ICONS (SVG Components) ---
     const IconWrapper = ({ children, size = 24, className = "" }) => (
       <svg 
@@ -153,8 +187,9 @@
 
     const COOLDOWN_MINUTES = 5;
     const STORAGE_KEY_USER = 'adc_lottery_user_v2';
-    const STORAGE_KEY_TICKETS = 'adc_lottery_tickets_v2';
-    const STORAGE_KEY_PRIZES = 'adc_lottery_prizes_v2';
+    // Remove local storage keys for data that moves to cloud
+    // const STORAGE_KEY_TICKETS = 'adc_lottery_tickets_v2'; 
+    // const STORAGE_KEY_PRIZES = 'adc_lottery_prizes_v2';
 
     const AppMode = {
       USER_DROP: 'USER_DROP',
@@ -223,10 +258,14 @@
 
     // --- MAIN APP ---
     const App = () => {
+      // User identity stays local
       const [user, setUser] = useState(null);
       const [inputName, setInputName] = useState('');
+      
+      // Data now comes from Firebase
       const [tickets, setTickets] = useState([]);
       const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
+      
       const [mode, setMode] = useState(AppMode.USER_DROP);
       
       const [selectedTopic, setSelectedTopic] = useState(SPEAKER_OPTIONS[0]);
@@ -241,40 +280,72 @@
       const [drawStep, setDrawStep] = useState('idle');
       const [finalWinner, setFinalWinner] = useState(null);
 
+      // --- INITIALIZATION ---
       useEffect(() => {
+        // Load User Identity from Local Storage
         const savedUser = localStorage.getItem(STORAGE_KEY_USER);
         if (savedUser) setUser(JSON.parse(savedUser));
 
-        const savedTickets = localStorage.getItem(STORAGE_KEY_TICKETS);
-        if (savedTickets) setTickets(JSON.parse(savedTickets));
+        if (!db) return;
 
-        const savedPrizes = localStorage.getItem(STORAGE_KEY_PRIZES);
-        if (savedPrizes) {
-          const parsed = JSON.parse(savedPrizes);
-          setPrizes(parsed);
-          setSelectedPrize(parsed[0] || '');
-        } else {
-          setSelectedPrize(DEFAULT_PRIZES[0]);
-        }
+        // 1. Listen to Tickets from Firebase
+        const ticketsRef = db.ref('tickets');
+        const handleTickets = (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            // Convert Object {key: val} -> Array [{id: key, ...val}]
+            const list = Object.entries(data).map(([key, value]) => ({
+              ...value,
+              id: key // Use Firebase Key as ID
+            }));
+            setTickets(list);
+          } else {
+            setTickets([]);
+          }
+        };
+        ticketsRef.on('value', handleTickets);
+
+        // 2. Listen to Prizes from Firebase
+        const prizesRef = db.ref('prizes');
+        const handlePrizes = (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            setPrizes(data);
+            // If currently selected prize is no longer in list, update it
+            if (!data.includes(selectedPrize)) {
+                setSelectedPrize(data[0] || '');
+            }
+          } else {
+            // Initialize prizes if empty
+            prizesRef.set(DEFAULT_PRIZES);
+            setPrizes(DEFAULT_PRIZES);
+          }
+        };
+        prizesRef.on('value', handlePrizes);
+
+        return () => {
+          ticketsRef.off('value', handleTickets);
+          prizesRef.off('value', handlePrizes);
+        };
       }, []);
 
-      const saveTickets = (newTickets) => {
-        setTickets(newTickets);
-        localStorage.setItem(STORAGE_KEY_TICKETS, JSON.stringify(newTickets));
-      };
+      // Auto-select first prize if not selected
+      useEffect(() => {
+        if (!selectedPrize && prizes.length > 0) {
+            setSelectedPrize(prizes[0]);
+        }
+      }, [prizes, selectedPrize]);
+
+
+      // --- ACTIONS ---
 
       const saveUser = (newUser) => {
         setUser(newUser);
         localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
       };
 
-      const savePrizes = (newPrizes) => {
-        setPrizes(newPrizes);
-        localStorage.setItem(STORAGE_KEY_PRIZES, JSON.stringify(newPrizes));
-        if (newPrizes.length > 0 && !newPrizes.includes(selectedPrize)) {
-          setSelectedPrize(newPrizes[0]);
-        }
-      };
+      // No local saveTickets anymore, direct to Firebase
+      // No local savePrizes anymore, direct to Firebase
 
       const handleExportCSV = () => {
         const BOM = "\uFEFF";
@@ -307,14 +378,14 @@
       const handleAddPrize = () => {
         if (!newPrizeInput.trim()) return;
         const updated = [...prizes, newPrizeInput.trim()];
-        savePrizes(updated);
+        if (db) db.ref('prizes').set(updated);
         setNewPrizeInput('');
       };
 
       const handleDeletePrize = (index) => {
         if (!confirm("Delete this prize?")) return;
         const updated = prizes.filter((_, i) => i !== index);
-        savePrizes(updated);
+        if (db) db.ref('prizes').set(updated);
       };
 
       const handleLogin = (e) => {
@@ -326,6 +397,7 @@
       const handleSubmitTicket = (e) => {
         e.preventDefault();
         if (!user) return;
+        if (!db) { alert("Database not connected"); return; }
 
         const now = Date.now();
         const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
@@ -335,20 +407,24 @@
           return;
         }
 
+        // Push new ticket to Firebase
+        const newTicketRef = db.ref('tickets').push();
         const newTicket = {
-          id: Date.now().toString(),
           to: selectedTopic,
           feedback: feedback.trim(),
           from: user.name,
           timestamp: now,
           isWinner: false,
         };
-
-        saveTickets([...tickets, newTicket]);
-        saveUser({ ...user, lastSubmissionTime: now });
-        setFeedback('');
         
-        confetti({ shapes: ['square'], colors: ['#3b4cca', '#ffde00', '#cc0000'], particleCount: 50, scalar: 2 });
+        // Save using the push key
+        newTicketRef.set(newTicket)
+          .then(() => {
+              saveUser({ ...user, lastSubmissionTime: now });
+              setFeedback('');
+              confetti({ shapes: ['square'], colors: ['#3b4cca', '#ffde00', '#cc0000'], particleCount: 50, scalar: 2 });
+          })
+          .catch(err => alert("Submission failed: " + err.message));
       };
 
       const handleDraw = () => {
@@ -361,6 +437,7 @@
           alert('Select a prize first!');
           return;
         }
+        if (!db) return;
 
         setIsDrawing(true);
         setDrawStep('shaking');
@@ -369,15 +446,21 @@
             const winnerIndex = Math.floor(Math.random() * eligibleTickets.length);
             const winner = eligibleTickets[winnerIndex];
             
-            const updatedTickets = tickets.map(t => 
-                t.id === winner.id ? { ...t, isWinner: true, wonPrize: selectedPrize } : t
-            );
-            saveTickets(updatedTickets);
-            setFinalWinner({ ...winner, wonPrize: selectedPrize });
-            setDrawStep('result');
-            setIsDrawing(false);
+            // Update Winner in Firebase
+            db.ref(`tickets/${winner.id}`).update({
+                isWinner: true,
+                wonPrize: selectedPrize
+            }).then(() => {
+                setFinalWinner({ ...winner, wonPrize: selectedPrize });
+                setDrawStep('result');
+                setIsDrawing(false);
+                confetti({ shapes: ['square'], colors: ['#ffde00', '#ffffff'], spread: 120, particleCount: 100 });
+            }).catch(err => {
+                alert("Draw update failed: " + err.message);
+                setIsDrawing(false);
+                setDrawStep('idle');
+            });
 
-            confetti({ shapes: ['square'], colors: ['#ffde00', '#ffffff'], spread: 120, particleCount: 100 });
         }, 2000);
       };
 
@@ -387,6 +470,18 @@
       };
 
       // --- RENDER ---
+      
+      // Error Screen
+      if (firebaseError) {
+        return (
+             <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-red-100 text-red-800">
+                <h1 className="text-2xl font-bold mb-2">Configuration Error</h1>
+                <p>請編輯 index.html 並填入 firebaseConfig。</p>
+                <p className="text-xs font-mono mt-4 bg-white p-2 border border-red-300 rounded">{firebaseError}</p>
+             </div>
+        );
+      }
+
       if (!user) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center p-4">
@@ -422,7 +517,7 @@
           <header className="p-4 flex flex-col items-center gap-2 bg-[#cc0000] border-b-4 border-[#202020] sticky top-0 z-50 shadow-lg">
             <h1 className="text-2xl font-pixel-en text-white drop-shadow-[2px_2px_0_#000]">ADC LUCKY DRAW</h1>
             <div className="bg-white px-4 py-1 border-2 border-[#202020] rounded-full flex items-center gap-2">
-               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+               <div className={`w-3 h-3 rounded-full animate-pulse ${db ? 'bg-green-500' : 'bg-red-500'}`}></div>
                <span className="text-xs font-bold uppercase">{user.name}</span>
             </div>
           </header>
@@ -461,7 +556,7 @@
                         <div className="text-center">
                           <span className="text-[10px] text-gray-500 uppercase">Cooldown: {COOLDOWN_MINUTES} Minutes</span>
                         </div>
-                        <RetroButton type="submit" variant="primary" className="w-full text-lg">SUBMIT</RetroButton>
+                        <RetroButton type="submit" variant="primary" className="w-full text-lg" disabled={!db}>SUBMIT</RetroButton>
                       </form>
                   </div>
                 </div>
@@ -521,7 +616,7 @@
                                  <div className="text-2xl font-bold font-pixel-en mb-2">{tickets.filter(t => !t.isWinner).length}</div>
                                  <div className="text-xs uppercase font-bold text-gray-500">Tickets Loaded</div>
                             </div>
-                            <RetroButton onClick={handleDraw} variant="success" className="mt-8 w-48 shadow-lg font-heiti text-2xl">
+                            <RetroButton onClick={handleDraw} variant="success" className="mt-8 w-48 shadow-lg font-heiti text-2xl" disabled={!db}>
                                 抽獎 !
                             </RetroButton>
                         </>
