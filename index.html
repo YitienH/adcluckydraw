@@ -11,8 +11,10 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- SheetJS for Excel Export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase SDK (Compat version for easier HTML inclusion) -->
+  <!-- Firebase SDK (Compat version) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
@@ -103,17 +105,17 @@
     const { useState, useEffect, useRef } = React;
 
     // --- FIREBASE CONFIGURATION ---
-    // [TODO]: 請填寫您的 Firebase 專案設定
+    // [TODO]: 請在此填入您的 Firebase Project Config
     const firebaseConfig = {
-    apiKey: "AIzaSyAPlzvOAG9aJTSGpFmf6qBsde2Po-CJanQ",
-    authDomain: "adc-luckydraw.firebaseapp.com",
-    databaseURL: "https://adc-luckydraw-default-rtdb.firebaseio.com/",
-    projectId: "adc-luckydraw",
-    storageBucket: "adc-luckydraw.firebasestorage.app",
-   messagingSenderId: "444458849826",
-    appId: "1:444458849826:web:a7bfe8311c3c550bf71c7b",
-   measurementId: "G-WTXTXEXC3E"
-};
+      apiKey: "AIzaSyAPlzvOAG9aJTSGpFmf6qBsde2Po-CJanQ",
+      authDomain: "adc-luckydraw.firebaseapp.com",
+      databaseURL: "https://adc-luckydraw-default-rtdb.firebaseio.com",
+      projectId: "adc-luckydraw",
+      storageBucket: "adc-luckydraw.firebasestorage.app",
+      messagingSenderId: "444458849826",
+      appId: "1:444458849826:web:a7bfe8311c3c550bf71c7b",
+      measurementId: "G-WTXTXEXC3E"
+    };
 
     // Initialize Firebase safely
     let db = null;
@@ -180,16 +182,34 @@
     ];
 
     const DEFAULT_PRIZES = [
-      "山海經火漆印章套裝",
-      "論道_組合裝茶",
-      "ROG 墨鏡"
-    ];
+          const DEFAULT_PRIZES = [
+          "山海經火漆印章套裝",
+          "論道_組合裝茶",
+          "ROG 墨鏡"
+          "摩卡壺",
+          "中國徽墨_硯台",
+          "桌遊",
+          "防災小物",
+          "航海王_魯夫帽",
+          "鵝肝醬",
+          "松露鹽",
+          "NV_隨行杯",
+          "鋼杯",
+          "托特包",
+          "色鉛筆+小袋",
+          "日本世博娃娃",
+          "GAMSOCM_手手",
+          "HUNTER_眼罩旅行組",
+          "TIGER_水壺",
+          "TIGER_袋子",
+          "看展小盲袋",
+          "巴黎風情T-SHIRT",
+          "巴黎風情T-SHIRT"
+        ];
 
-    const COOLDOWN_MINUTES = 5;
+    // [MODIFIED] Cooldown set to 10 minutes as requested
+    const COOLDOWN_MINUTES = 10;
     const STORAGE_KEY_USER = 'adc_lottery_user_v2';
-    // Remove local storage keys for data that moves to cloud
-    // const STORAGE_KEY_TICKETS = 'adc_lottery_tickets_v2'; 
-    // const STORAGE_KEY_PRIZES = 'adc_lottery_prizes_v2';
 
     const AppMode = {
       USER_DROP: 'USER_DROP',
@@ -280,6 +300,9 @@
       const [drawStep, setDrawStep] = useState('idle');
       const [finalWinner, setFinalWinner] = useState(null);
 
+      // Submission Success Modal State
+      const [showSuccessModal, setShowSuccessModal] = useState(false);
+
       // --- INITIALIZATION ---
       useEffect(() => {
         // Load User Identity from Local Storage
@@ -299,8 +322,19 @@
               id: key // Use Firebase Key as ID
             }));
             setTickets(list);
+            
+            // [MODIFIED] Explicit DOM update for ticket count as requested
+            setTimeout(() => {
+                const countEl = document.getElementById('ticket-count');
+                if (countEl) countEl.innerText = `目前已累積投入：${list.length} 張`;
+            }, 0);
           } else {
             setTickets([]);
+            // Update empty state
+            setTimeout(() => {
+                const countEl = document.getElementById('ticket-count');
+                if (countEl) countEl.innerText = `目前已累積投入：0 張`;
+            }, 0);
           }
         };
         ticketsRef.on('value', handleTickets);
@@ -344,9 +378,6 @@
         localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
       };
 
-      // No local saveTickets anymore, direct to Firebase
-      // No local savePrizes anymore, direct to Firebase
-
       const handleExportCSV = () => {
         const BOM = "\uFEFF";
         const header = ["ID,From,To,Feedback,Timestamp,IsWinner,Prize"];
@@ -373,6 +404,27 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+      };
+
+      // Helper for Excel Export of Winners
+      const handleExportWinners = () => {
+        const winners = tickets.filter(t => t.isWinner).map(t => ({
+          Name: t.from,
+          Prize: t.wonPrize,
+          Feedback: t.feedback,
+          Target: t.to,
+          Time: new Date(t.timestamp).toLocaleString()
+        }));
+
+        if (typeof XLSX === 'undefined') {
+            alert("Excel library not loaded. Please try again.");
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(winners);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Winners");
+        XLSX.writeFile(wb, `ADC_Winners_${new Date().toISOString().slice(0,10)}.xlsx`);
       };
 
       const handleAddPrize = () => {
@@ -408,6 +460,7 @@
         }
 
         // Push new ticket to Firebase
+        // [MODIFIED] High concurrency support: push() generates a unique key automatically
         const newTicketRef = db.ref('tickets').push();
         const newTicket = {
           to: selectedTopic,
@@ -423,21 +476,32 @@
               saveUser({ ...user, lastSubmissionTime: now });
               setFeedback('');
               confetti({ shapes: ['square'], colors: ['#3b4cca', '#ffde00', '#cc0000'], particleCount: 50, scalar: 2 });
+              // Show success modal
+              setShowSuccessModal(true);
           })
           .catch(err => alert("Submission failed: " + err.message));
       };
 
       const handleDraw = () => {
-        const eligibleTickets = tickets.filter(t => !t.isWinner);
-        if (eligibleTickets.length === 0) {
-          alert('The box is empty!');
-          return;
-        }
+        if (!db) return;
         if (!selectedPrize) {
           alert('Select a prize first!');
           return;
         }
-        if (!db) return;
+
+        // [MODIFIED] Unique Winner Logic
+        // 1. Identify all names that have ALREADY won a prize
+        const winningNames = new Set(tickets.filter(t => t.isWinner).map(t => t.from));
+
+        // 2. Filter tickets:
+        //    - Must NOT be a winning ticket already (!t.isWinner)
+        //    - User Name must NOT represent a previous winner (!winningNames.has(t.from))
+        const eligibleTickets = tickets.filter(t => !t.isWinner && !winningNames.has(t.from));
+
+        if (eligibleTickets.length === 0) {
+          alert('No eligible tickets left! (All participants have won or box is empty)');
+          return;
+        }
 
         setIsDrawing(true);
         setDrawStep('shaking');
@@ -527,12 +591,14 @@
             {/* TICKET MODE */}
             {mode === AppMode.USER_DROP && (
               <div className="animate-fade-in-up">
-                <div className="pixel-ticket p-6 pb-8">
-                  <div className="border-4 border-dashed border-[#ccc] p-4 h-full">
-                      <h2 className="text-center text-3xl font-black mb-6 tracking-widest text-[#202020] border-b-2 border-[#202020] pb-4 font-heiti">
+                {/* [MODIFIED] Removed pb-8 for tighter fit */}
+                <div className="pixel-ticket p-6">
+                  {/* [MODIFIED] Removed h-full, used flex col for spacing */}
+                  <div className="border-4 border-dashed border-[#ccc] p-4 flex flex-col gap-4">
+                      <h2 className="text-center text-3xl font-black tracking-widest text-[#202020] border-b-2 border-[#202020] pb-2 font-heiti">
                         抽 獎 券
                       </h2>
-                      <form onSubmit={handleSubmitTicket} className="space-y-6">
+                      <form onSubmit={handleSubmitTicket} className="space-y-4">
                         <div>
                           <label className="block text-xs font-bold uppercase mb-1 text-[#3b4cca] font-pixel-en">Target (To)</label>
                           <select
@@ -554,10 +620,16 @@
                           />
                         </div>
                         <div className="text-center">
+                          {/* [MODIFIED] Display correct cooldown time variable */}
                           <span className="text-[10px] text-gray-500 uppercase">Cooldown: {COOLDOWN_MINUTES} Minutes</span>
                         </div>
                         <RetroButton type="submit" variant="primary" className="w-full text-lg" disabled={!db}>SUBMIT</RetroButton>
                       </form>
+
+                      {/* [MODIFIED] Live stats inside ticket with requested ID */}
+                      <div id="ticket-count" className="mt-2 text-center border-t-2 border-dashed border-[#eee] pt-2 text-[10px] font-bold text-black-400 font-heiti tracking-wider">
+                         目前已累積投入：{tickets.length} 張
+                      </div>
                   </div>
                 </div>
               </div>
@@ -613,8 +685,12 @@
                         <>
                             <PixelLuckyBox shaking={false} />
                             <div className="mt-8 text-center">
-                                 <div className="text-2xl font-bold font-pixel-en mb-2">{tickets.filter(t => !t.isWinner).length}</div>
-                                 <div className="text-xs uppercase font-bold text-gray-500">Tickets Loaded</div>
+                                 {/* Calculate Eligible Unique Users */}
+                                 <div className="text-2xl font-bold font-pixel-en mb-2">
+                                    {/* Display approximate eligible tickets count */}
+                                    {tickets.filter(t => !t.isWinner).length}
+                                 </div>
+                                 <div className="text-xs uppercase font-bold text-gray-500">Tickets Eligible</div>
                             </div>
                             <RetroButton onClick={handleDraw} variant="success" className="mt-8 w-48 shadow-lg font-heiti text-2xl" disabled={!db}>
                                 抽獎 !
@@ -688,7 +764,12 @@
                     <RetroCard title="Hall of Fame" className="w-full max-h-[80vh] overflow-y-auto">
                         <div className="flex justify-between mb-4 items-center">
                             <span className="text-xs uppercase font-bold">Winners Log</span>
-                            <button onClick={() => setShowWinnerList(false)} className="bg-red-500 text-white p-1 border border-black"><Icons.X size={16} /></button>
+                            <div className="flex gap-2">
+                                <button onClick={handleExportWinners} className="bg-green-500 text-white px-2 py-1 text-xs border border-black font-bold font-pixel-en">
+                                    Export .xlsx
+                                </button>
+                                <button onClick={() => setShowWinnerList(false)} className="bg-red-500 text-white p-1 border border-black"><Icons.X size={16} /></button>
+                            </div>
                         </div>
                         <table className="w-full text-xs text-left">
                             <thead className="border-b-2 border-black bg-gray-100">
@@ -709,6 +790,24 @@
                     </RetroCard>
                 </div>
             )}
+
+            {/* SUBMISSION SUCCESS MODAL */}
+            {showSuccessModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 animate-fade-in-up">
+                    <RetroCard title="SUCCESS" className="w-full max-w-sm text-center">
+                        <div className="py-6">
+                            <p className="font-pixel-en text-xl mb-2 text-[#3b4cca]">GREAT JOB!</p>
+                            <p className="font-heiti text-lg font-bold text-[#202020]">抽獎券投入成功！</p>
+                            <div className="mt-4 flex justify-center">
+                                <PixelLuckyBox shaking={false} />
+                            </div>
+                        </div>
+                        <RetroButton onClick={() => setShowSuccessModal(false)} variant="success" className="w-full">
+                            OK!
+                        </RetroButton>
+                    </RetroCard>
+                </div>
+            )}
           </main>
 
           {/* FOOTER */}
@@ -721,13 +820,14 @@
                   <span className="font-heiti font-bold text-lg tracking-widest">再投一張</span>
               </button>
               
-              <div className="hidden sm:flex gap-2 items-center">
+              <div className="flex gap-2 items-center">
                 <button onClick={() => setShowWinnerList(true)} className="p-3 rounded border-2 border-transparent text-gray-500 hover:text-white hover:bg-gray-800 transition-colors" title="得獎名單">
                     <Icons.Gift size={24} />
                 </button>
+                {/* ADMIN DRAW BUTTON - HIDDEN ON MOBILE */}
                 <button 
                     onClick={() => setMode(AppMode.ADMIN_DRAW)} 
-                    className={`p-3 rounded border-2 border-transparent transition-colors ${mode === AppMode.ADMIN_DRAW ? 'bg-[#ffde00] text-black border-black' : 'text-gray-500 hover:text-white hover:bg-gray-800'}`}
+                    className={`hidden sm:block p-3 rounded border-2 border-transparent transition-colors ${mode === AppMode.ADMIN_DRAW ? 'bg-[#ffde00] text-black border-black' : 'text-gray-500 hover:text-white hover:bg-gray-800'}`}
                     title="抽獎介面"
                 >
                     <Icons.Star size={24} />
